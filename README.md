@@ -1,6 +1,6 @@
-# FAIR 
+# FAIR - Athletic Talent Discovery Platform
 
-A comprehensive backend API system for managing athletic performance, coaching workflows, and team communication. Built with ASP.NET Core, the system provides role-based access control, real-time messaging, and performance analytics for coaches and players.
+A sport management system designed to identify and nurture athletic talent through data-driven performance tracking. Coaches evaluate players with detailed reports and scores, while an intelligent ranking system highlights top performers, all supported by real-time communication for immediate feedback and guidance.
 
 ## Overview
 
