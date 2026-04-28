@@ -1,9 +1,12 @@
-﻿using FAIR.Domain.Entities.Chat;
+using FAIR.Domain.Entities.Chat;
+
 namespace FAIR.Domain.Interfaces
 {
     public interface IChatRepository
     {
         Task<Message> SaveMessageAsync(Message message);
         Task<List<Message>> GetPrivateMessagesAsync(string userId1, string userId2);
+        Task<int> MarkConversationAsReadAsync(string readerUserId, string otherUserId);
+        Task<int> GetUnreadMessagesCountAsync(string userId);
     }
 }

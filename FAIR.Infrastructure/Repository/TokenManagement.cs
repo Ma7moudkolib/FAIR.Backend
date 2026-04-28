@@ -1,6 +1,6 @@
 ﻿using FAIR.Domain.Entities.Identity;
 using FAIR.Domain.Interfaces;
-using FAIR.Infrastructure.Data;
+using FAIR.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 
 namespace FAIR.Infrastructure.Repository
 {
-    public class TokenManagement(AppDbContext context , IConfiguration config) : ITokenManagement
+    public class TokenManagement(dbContext context , IConfiguration config) : ITokenManagement
     {
         public async Task<int> AddRefreshToken(string userId, string refreshToken)
         {
