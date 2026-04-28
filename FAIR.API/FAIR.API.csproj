@@ -24,7 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\FAIR.Infrastructure\FAIR.Infrastructure.csproj" />
+	<ProjectReference Include="..\FAIR.Application\FAIR.Application.csproj" />
   </ItemGroup>
 
 </Project>

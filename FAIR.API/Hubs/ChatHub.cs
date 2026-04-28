@@ -1,55 +1,123 @@
-﻿using FAIR.Application.DTOs.Chat;
+using FAIR.Application.DTOs.Chat;
+using FAIR.Application.Services.Interfaces.Managers;
 using FAIR.Domain.Entities.Chat;
 using FAIR.Domain.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
-using System.Collections.Concurrent;
+using System.Security.Claims;
+
 namespace FAIR.API.Hubs
 {
-    public class ChatHub(IChatRepository chatRepository , IUserRepository userRepository ) : Hub
+    [Authorize]
+    public class ChatHub(
+        IRepositoryManager repositoryManager,
+        IServiceManager serviceManager) : Hub
     {
-        private readonly ConcurrentDictionary<string, OnlineUser> onlineUsers = new();
-        private readonly IUserRepository _userRepository = userRepository;
-        private readonly IChatRepository _chatRepository = chatRepository;
+        private readonly IRepositoryManager _repositoryManager = repositoryManager;
+        private readonly IServiceManager _serviceManager = serviceManager;
+
         public override async Task OnConnectedAsync()
         {
-            var httpContext = Context.GetHttpContext();
-            var recevierId = httpContext!.Request.Query["senderId"].ToString();
-            var userName = Context.User!.Identity!.Name;
-            var currentUser = await _userRepository.GetByUsernameAsync(userName!);
-            var connectionId = Context.ConnectionId;
-            if (onlineUsers.ContainsKey(connectionId))
+            var userId = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!string.IsNullOrWhiteSpace(userId))
             {
-                onlineUsers[userName!].ConnectionId = connectionId;
+                _serviceManager.ConnectionMappingService.AddOrUpdate(userId, Context.ConnectionId);
+                await Clients.User(userId).SendAsync("Connected", userId);
             }
-            else
-            {
-                var user = new OnlineUser
-                {
-                    UserName = userName,
-                    ConnectionId = connectionId,
-                    FullName = currentUser.UserName
-                };
-                onlineUsers.TryAdd(connectionId, user);
-            }
-        }
-        public async Task SendMessage(MessageRequest message)
-        {
-            var senderId = Context.User!.Identity!.Name;
-            var receiverId = message.ReceiverId;
 
-            var newMess = new Message
+            await base.OnConnectedAsync();
+        }
+
+        public override async Task OnDisconnectedAsync(Exception? exception)
+        {
+            _serviceManager.ConnectionMappingService.Remove(Context.ConnectionId);
+            await base.OnDisconnectedAsync(exception);
+        }
+
+        public async Task SendPrivateMessage(MessageRequest message)
+        {
+            var senderId = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(senderId) || string.IsNullOrWhiteSpace(message.ReceiverId) || string.IsNullOrWhiteSpace(message.Content))
             {
-                Sender = await _userRepository.GetByIdAsync(senderId!),
-                ReceiverId = receiverId,
+                return;
+            }
+
+            var sender = await _repositoryManager.UserRepository.GetByIdAsync(senderId, false);
+            var dbMessage = new Message
+            {
+                SenderId = senderId,
+                ReceiverId = message.ReceiverId,
+                SenderName = sender?.UserName,
                 IsRead = false,
                 Content = message.Content,
-                CreateData = DateTime.Now
-
+                CreateData = DateTime.UtcNow
             };
-            await _chatRepository.SaveMessageAsync(newMess);
-            await Clients.User(receiverId!).SendAsync("RecivedMessage", newMess);
 
+            var saved = await _repositoryManager.ChatRepository.SaveMessageAsync(dbMessage);
+            await Clients.User(message.ReceiverId).SendAsync("ReceivedMessage", saved);
+            await Clients.User(senderId).SendAsync("MessageSent", saved);
         }
 
+        public async Task SendMessage(MessageRequest message)
+        {
+            await SendPrivateMessage(message);
+        }
+
+        public async Task Typing(string receiverId, bool isTyping)
+        {
+            var senderId = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(senderId) || string.IsNullOrWhiteSpace(receiverId))
+            {
+                return;
+            }
+
+            await Clients.User(receiverId).SendAsync("Typing", new
+            {
+                SenderId = senderId,
+                IsTyping = isTyping,
+                Timestamp = DateTime.UtcNow
+            });
+        }
+
+        public async Task MarkAsRead(string otherUserId)
+        {
+            var readerUserId = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(readerUserId) || string.IsNullOrWhiteSpace(otherUserId))
+            {
+                return;
+            }
+
+            var changed = await _repositoryManager.ChatRepository.MarkConversationAsReadAsync(readerUserId, otherUserId);
+            if (changed > 0)
+            {
+                await Clients.User(otherUserId).SendAsync("ReadReceipt", new
+                {
+                    ReaderId = readerUserId,
+                    Timestamp = DateTime.UtcNow
+                });
+            }
+        }
+
+        public async Task<List<Message>> GetConversation(string otherUserId)
+        {
+            var currentUserId = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(currentUserId) || string.IsNullOrWhiteSpace(otherUserId))
+            {
+                return [];
+            }
+
+            return await _repositoryManager.ChatRepository.GetPrivateMessagesAsync(currentUserId, otherUserId);
+        }
+
+        public async Task<int> GetUnreadCount()
+        {
+            var currentUserId = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(currentUserId))
+            {
+                return 0;
+            }
+
+            return await _repositoryManager.ChatRepository.GetUnreadMessagesCountAsync(currentUserId);
+        }
     }
 }

@@ -1,57 +1,47 @@
+using FAIR.API.Extensions;
 using FAIR.API.Hubs;
-using FAIR.Application.DependencyInjenction;
-using FAIR.Infrastructure.DependencyInjection;
+using FAIR.Application.Services.Interfaces.Logging;
 using Serilog;
+
 var builder = WebApplication.CreateBuilder(args);
+
 Log.Logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
     .WriteTo.Console()
     .WriteTo.File("log/log.txt", rollingInterval: RollingInterval.Day)
     .CreateLogger();
+
 builder.Host.UseSerilog();
-Log.Logger.Information("Application is Building.........");
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddInfrastructureService(builder.Configuration);
-builder.Services.AddApplicationService();
 builder.Services.AddSignalR();
-builder.Services.AddCors(builder => {
-    builder.AddDefaultPolicy(options =>
-    {
-        options.AllowAnyHeader()
-        .AllowAnyMethod()
-        .WithOrigins()
-        .AllowCredentials();
-    });
-});
 
-try
-{
-    var app = builder.Build();
-    app.UseSerilogRequestLogging();
-    // Configure the HTTP request pipeline.
-  //  if (app.Environment.IsDevelopment())
-   // {
-        app.UseSwagger();
-        app.UseSwaggerUI();
-   // }
-    app.UseInfrastructureService();
-    app.UseHttpsRedirection();
+builder.Services.ConfigureCors();
+builder.Services.ConfigureSqlContext(builder.Configuration);
+builder.Services.ConfigureRepositoryManager();
+builder.Services.ConfigureServiceManager(builder.Configuration);
+builder.Services.ConfigureJWT(builder.Configuration);
 
-    app.UseAuthorization();
+var app = builder.Build();
+var logger = app.Services.GetRequiredService<IAppLogger<Program>>();
 
-    app.MapControllers();
-    app.MapHub<ChatHub>("/chat");
-    Log.Logger.Information("Application is running........");
-    app.Run();
-}
-catch(Exception ex )
+app.ConfigureExceptionHandler(logger);
+app.UseSerilogRequestLogging();
+
+if (app.Environment.IsDevelopment())
 {
-    Log.Logger.Error(ex, "Application failed to Start....");
-}
-finally
-{
-    Log.CloseAndFlush();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
+app.UseHttpsRedirection();
+app.UseCors("CorsPolicy");
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllers();
+app.MapHub<ChatHub>("/chat");
+
+app.Run();
