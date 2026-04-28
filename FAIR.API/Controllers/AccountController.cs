@@ -1,8 +1,6 @@
-﻿using FAIR.Application.DTOs.Profile;
-using FAIR.Application.Services.Implementations.Profile;
-using FAIR.Application.Services.Interfaces;
+using FAIR.Application.DTOs.Profile;
+using FAIR.Application.Services.Interfaces.Managers;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FAIR.API.Controllers
@@ -10,38 +8,40 @@ namespace FAIR.API.Controllers
     [Route("api/[controller]")]
     [ApiController]
     [Authorize]
-    public class AccountController(IUserService _userService ) : ControllerBase
+    public class AccountController(IServiceManager serviceManager) : ControllerBase
     {
-        //private readonly UserService _userService = userService;
         [HttpGet("playerProfile/{playerId}")]
-        public async Task<IActionResult> GetPlayerProfile(string playerId )
+        public async Task<IActionResult> GetPlayerProfile(string playerId)
         {
-            var profile = await _userService.GetPlayerProfileAsync(playerId);
-            return profile != null? Ok(profile) : NotFound();
+            var profile = await serviceManager.UserService.GetPlayerProfileAsync(playerId);
+            return profile != null ? Ok(profile) : NotFound();
         }
-        [HttpGet("coachProfile")]
+
+        [HttpGet("coachProfile/{coachId}")]
         public async Task<IActionResult> CoachProfile(string coachId)
         {
-            var profile = await _userService.GetCoachProfileAsync(coachId);
+            var profile = await serviceManager.UserService.GetCoachProfileAsync(coachId);
             return profile != null ? Ok(profile) : NotFound();
         }
 
         [HttpPut("updatePlayerProfile")]
         public async Task<IActionResult> UpdatePlayerProfile([FromBody] UpdatePlayerProfile playerProfile)
         {
-            var result = await _userService.UpdatePlayerProfileAsync(playerProfile);
+            var result = await serviceManager.UserService.UpdatePlayerProfileAsync(playerProfile);
             return Ok(result);
         }
+
         [HttpPut("updateCoachProfile")]
         public async Task<IActionResult> UpdateCoachProfile([FromBody] UpdateCoachProfile coachProfile)
         {
-            var result = await _userService.UpdateCoachProfileAsync(coachProfile);
+            var result = await serviceManager.UserService.UpdateCoachProfileAsync(coachProfile);
             return Ok(result);
         }
+
         [HttpPut("change-password")]
-        public async Task<IActionResult> ChangePassword( string userId, [FromBody]ChangePasswordRequest request )
+        public async Task<IActionResult> ChangePassword(string userId, [FromBody] ChangePasswordRequest request)
         {
-            var result = await _userService.ChangePasswordAsync(userId, request);
+            var result = await serviceManager.UserService.ChangePasswordAsync(userId, request);
             return Ok(result);
         }
     }
