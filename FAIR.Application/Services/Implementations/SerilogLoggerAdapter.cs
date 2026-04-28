@@ -1,6 +1,7 @@
 ﻿using FAIR.Application.Services.Interfaces.Logging;
 using Microsoft.Extensions.Logging;
-namespace eCommerce.Infrastructure.Services
+
+namespace FAIR.Application.Services.Implementations
 {
     public class SerilogLoggerAdapter<T>(ILogger<T> logger) : IAppLogger<T>
     {
