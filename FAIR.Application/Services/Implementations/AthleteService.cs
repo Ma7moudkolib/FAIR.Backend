@@ -1,15 +1,83 @@
 using AutoMapper;
+using FAIR.Application.DTOs;
+using FAIR.Application.DTOs.Profile;
 using FAIR.Application.DTOs.Search;
+using FAIR.Application.Exceptions;
 using FAIR.Application.Services.Interfaces;
+using FAIR.Domain.Entities.Identity;
 using FAIR.Domain.Interfaces;
+using FluentValidation;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace FAIR.Application.Services.Implementations
 {
-    public class AthleteSearchService(IRepositoryManager repositoryManager, IMapper mapper) : IAthleteSearchService
+    public class AthleteService(
+        IRepositoryManager repositoryManager,
+        IMapper mapper,
+        IValidator<UpdateAthleteProfile> updateAthleteProfileValidator,
+        IValidator<ChangePasswordRequest> changePasswordRequestValidator,
+        IValidator<AthleteSearchFilter> athleteSearchFilterValidator) : IAthleteService
     {
+        public async Task<AthleteProfile> GetAthleteProfileAsync(string athleteId)
+        {
+            var athlete = await repositoryManager.AthleteRepository.GetByIdAsync(athleteId, false);
+            if (athlete is null)
+                return new AthleteProfile();
+            return mapper.Map<AthleteProfile>(athlete);
+        }
+
+        public async Task<ServiceResponse> UpdateAthleteProfileAsync(UpdateAthleteProfile profile)
+        {
+            var validationResult = await updateAthleteProfileValidator.ValidateAsync(profile);
+            if (!validationResult.IsValid)
+            {
+                throw new ServiceValidationException(validationResult.Errors);
+            }
+
+            var athlete = await repositoryManager.AthleteRepository.GetByIdAsync(profile.Id, true);
+            if (athlete is null)
+                return new ServiceResponse(false, "Athlete Not Found!");
+
+            mapper.Map(profile, athlete);
+            await repositoryManager.SaveAsync();
+            return new ServiceResponse(true, "Update Profile!");
+        }
+
+        public async Task<ServiceResponse> ChangePasswordAsync(string athleteId, ChangePasswordRequest request)
+        {
+            var validationResult = await changePasswordRequestValidator.ValidateAsync(request);
+            if (!validationResult.IsValid)
+            {
+                throw new ServiceValidationException(validationResult.Errors);
+            }
+
+            var athlete = await repositoryManager.AthleteRepository.GetByIdAsync(athleteId, true);
+            if (athlete is null)
+            {
+                return new ServiceResponse(false, "Athlete Not Found!");
+            }
+
+            if (!VerifyPassword(request.CurrentPassword, athlete.PasswordHash))
+            {
+                return new ServiceResponse(false, "Incorrect current password");
+            }
+
+            athlete.PasswordHash = HashPassword(request.NewPassword);
+            await repositoryManager.SaveAsync();
+
+            return new ServiceResponse(true, "Success to Change Password");
+        }
+
         public async Task<IReadOnlyList<AthleteSearchResult>> SearchAsync(AthleteSearchFilter filter, CancellationToken cancellationToken = default)
         {
-            var query = repositoryManager.AthleteSearchRepository.QueryAthletes();
+            var validationResult = await athleteSearchFilterValidator.ValidateAsync(filter, cancellationToken);
+            if (!validationResult.IsValid)
+            {
+                throw new ServiceValidationException(validationResult.Errors);
+            }
+
+            var query = repositoryManager.AthleteRepository.QueryAthletes();
 
             if (!string.IsNullOrWhiteSpace(filter.PrimarySport))
             {
@@ -53,7 +121,7 @@ namespace FAIR.Application.Services.Implementations
             {
                 var athlete = athletes.First(a => a.Id == result.AthleteId);
                 result.Age = CalculateAge(athlete.DateOfBirth);
-                result.AverageScorePercentage = await repositoryManager.VideoAnalysis.AverageScorePercentage(result.AthleteId);
+                result.AverageScorePercentage = await repositoryManager.VideoAnalysis.AverageScorePercentage(result.AthleteId, cancellationToken);
                 result.WeightedScore = CalculateWeightedScore(athlete, result.AverageScorePercentage);
             }
 
@@ -80,6 +148,26 @@ namespace FAIR.Application.Services.Implementations
                 .ToList();
         }
 
+        private static bool VerifyPassword(string password, string? storedHash)
+        {
+            if (string.IsNullOrWhiteSpace(storedHash))
+            {
+                return false;
+            }
+
+            using var sha256 = SHA256.Create();
+            var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
+            var hashedPassword = Convert.ToBase64String(hashedBytes);
+            return hashedPassword == storedHash;
+        }
+
+        private static string HashPassword(string password)
+        {
+            using var sha256 = SHA256.Create();
+            var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
+            return Convert.ToBase64String(hashedBytes);
+        }
+
         private static int CalculateAge(DateOnly birthDate)
         {
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -92,7 +180,7 @@ namespace FAIR.Application.Services.Implementations
             return age;
         }
 
-        private static decimal CalculateWeightedScore(Domain.Entities.Identity.Player athlete, decimal averageScore)
+        private static decimal CalculateWeightedScore(Athlete athlete, decimal averageScore)
         {
             const decimal winRateWeight = 0.30m;
             const decimal rankingWeight = 0.25m;

@@ -3,10 +3,10 @@ namespace FAIR.Application.Services.Interfaces.Managers
     public interface IServiceManager
     {
         IAuthenticationService AuthenticationService { get; }
-        IUserService UserService { get; }
-
+        IAthleteService AthleteService { get; }
+        ICoachService CoachService { get; }
         IVideoService VideoService { get; }
-        IAthleteSearchService AthleteSearchService { get; }
+        IChatService ChatService { get; }
         IConnectionMappingService ConnectionMappingService { get; }
 
     }

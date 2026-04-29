@@ -1,8 +1,8 @@
 using AutoMapper;
 using FAIR.Application.DTOs;
 using FAIR.Application.DTOs.Identity;
+using FAIR.Application.Exceptions;
 using FAIR.Application.Services.Interfaces;
-using FAIR.Application.Validations;
 using FAIR.Domain.Entities.Identity;
 using FAIR.Domain.Interfaces;
 using FluentValidation;
@@ -15,66 +15,73 @@ namespace FAIR.Application.Services.Implementations
         IRepositoryManager repositoryManager,
         IMapper mapper,
         IValidator<Register> registerValidation,
-        IValidator<Login> loginUserValidation,
-        IValidationService validation) : IAuthenticationService
+        IValidator<Login> loginUserValidation) : IAuthenticationService
     {
         public async Task<ServiceResponse> CreateUser(Register createUser)
         {
-            var validationResult = await validation.ValidateAsync(createUser, registerValidation);
-            if (!validationResult.Success)
+            var validationResult = await registerValidation.ValidateAsync(createUser);
+            if (!validationResult.IsValid)
             {
-                return validationResult;
+                throw new ServiceValidationException(validationResult.Errors);
             }
 
-            var checkUserEmail = await repositoryManager.UserRepository.GetByEmailAsync(createUser.Email);
-            if (checkUserEmail != null)
+            var isAthlete = createUser.Role.ToLower() == "athlete";
+            var isCoach = createUser.Role.ToLower() == "coach";
+
+            if (!isAthlete && !isCoach)
+            {
+                return new ServiceResponse(false, "This Role is not available. Please use 'athlete' or 'coach'.");
+            }
+
+            if (await repositoryManager.UserRepository.EmailExistsAsync(createUser.Email))
             {
                 return new ServiceResponse(false, "Email is already registered!");
             }
 
-            var checkUserName = await repositoryManager.UserRepository.GetByUsernameAsync(createUser.Username);
-            if (checkUserName != null)
+            if (await repositoryManager.UserRepository.UsernameExistsAsync(createUser.Username))
             {
                 return new ServiceResponse(false, "UserName is already registered!");
             }
 
-            AppUser user;
-            if (createUser.Role.ToLower() == "player")
+
+            if (isAthlete)
             {
-                user = mapper.Map<Player>(createUser);
+                var athlete = mapper.Map<Athlete>(createUser);
+                athlete.Role = "Athlete";
+                athlete.PasswordHash = HashPassword(createUser.Password);
+                repositoryManager.AthleteRepository.CreateAthleteAsync(athlete);
             }
-            else if (createUser.Role.ToLower() == "coach")
+            else if (isCoach)
             {
-                user = mapper.Map<Coach>(createUser);
-            }
-            else
-            {
-                return new ServiceResponse(false, "This Role not available.");
+                var coach = mapper.Map<Coach>(createUser);
+                coach.Role = "Coach";
+                coach.PasswordHash = HashPassword(createUser.Password);
+                repositoryManager.CoachRepository.CreateCoachAsync(coach);
             }
 
-            user.PasswordHash = createUser.Password;
-            var isCreated = await repositoryManager.UserRepository.CreateUserAsync(user);
-            return isCreated
+           int isCreated = await repositoryManager.SaveAsync();
+
+            return isCreated > 0
                 ? new ServiceResponse(true, "Created Account")
-                : new ServiceResponse(false, "Error occure Create the Account");
+                : new ServiceResponse(false, "Error occurred creating the Account");
         }
 
         public async Task<LoginResponse> LoginUser(Login login)
         {
-            var validationResult = await validation.ValidateAsync(login, loginUserValidation);
-            if (!validationResult.Success)
+            var validationResult = await loginUserValidation.ValidateAsync(login);
+            if (!validationResult.IsValid)
             {
-                return new LoginResponse(message: validationResult.message);
+                throw new ServiceValidationException(validationResult.Errors);
             }
 
-            var user = await repositoryManager.UserRepository.GetByUsernameAsync(login.Username);
+            var user = await repositoryManager.UserRepository.GetAnyByUsernameAsync(login.Username);
+
             if (user == null)
             {
                 return new LoginResponse(message: "Invalid UserName or Password");
             }
 
-            var isValidPassword = await repositoryManager.UserRepository.ChechPasswordAsync(user, login.Password);
-            if (!isValidPassword)
+            if (!VerifyPassword(login.Password, user.PasswordHash!))
             {
                 return new LoginResponse(message: "Invalid UserName or Password");
             }
@@ -84,7 +91,7 @@ namespace FAIR.Application.Services.Implementations
             var saveTokenResult = await repositoryManager.TokenManagement.AddRefreshToken(user.Id, refreshToken);
 
             return saveTokenResult <= 0
-                ? new LoginResponse(message: "Internal error occurred while authentiacatint.")
+                ? new LoginResponse(message: "Internal error occurred while authenticating.")
                 : new LoginResponse(Success: true, Token: token, refreshToken: refreshToken);
         }
 
@@ -97,7 +104,14 @@ namespace FAIR.Application.Services.Implementations
             }
 
             var userId = await repositoryManager.TokenManagement.GetUserIdByRefreshToken(refreshToken);
-            var user = await repositoryManager.UserRepository.GetByIdAsync(userId,false);
+            
+            var user = await repositoryManager.UserRepository.GetAnyByIdAsync(userId);
+
+            if (user == null)
+            {
+                return new LoginResponse(message: "User not found.");
+            }
+
             var newtoken = repositoryManager.TokenManagement.GenerateToken(user);
             var newrefreshToken = repositoryManager.TokenManagement.GetRefreshToken();
             await repositoryManager.TokenManagement.UpdateRefreshToken(newrefreshToken);
