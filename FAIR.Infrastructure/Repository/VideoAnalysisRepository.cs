@@ -9,7 +9,7 @@ namespace FAIR.Infrastructure.Repository
     {
         public void CreateVideoAnalysis(VideoAnalysis videoAnalysis)=> Create(videoAnalysis);
 
-        public async Task<IEnumerable<VideoAnalysis>> GetAllByAthleteIdAsync(Guid athleteId, bool trackChanges) => 
+        public async Task<IEnumerable<VideoAnalysis>> GetAllByAthleteIdAsync(string athleteId, bool trackChanges) => 
             await FindByCondition(x => x.AthleteId == athleteId, trackChanges).ToListAsync();
 
         public async Task<VideoAnalysis> GetByIdAsync(Guid analysisId, bool trackChanges) 
@@ -17,8 +17,7 @@ namespace FAIR.Infrastructure.Repository
 
         public async Task<decimal> AverageScorePercentage(string athleteId, CancellationToken cancellationToken = default)
         {
-            if (!Guid.TryParse(athleteId, out var id)) return 0;
-            var query = context.VideoAnalyses.Where(x => x.AthleteId == id);
+            var query = context.VideoAnalyses.Where(x => x.AthleteId == athleteId);
             if (!await query.AnyAsync(cancellationToken)) return 0;
             return await query.AverageAsync(x => x.ScorePercentage, cancellationToken);
         }
