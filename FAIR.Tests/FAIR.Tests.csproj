@@ -37,10 +37,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\FAIR.API\FAIR.API.csproj" />
-    <ProjectReference Include="..\FAIR.Application\FAIR.Application.csproj" />
-    <ProjectReference Include="..\FAIR.Domain\FAIR.Domain.csproj" />
-    <ProjectReference Include="..\FAIR.Infrastructure\FAIR.Infrastructure.csproj" />
+    <ProjectReference Include="..\src\FAIR.API\FAIR.API.csproj" />
+    <ProjectReference Include="..\src\FAIR.Application\FAIR.Application.csproj" />
+    <ProjectReference Include="..\src\FAIR.Domain\FAIR.Domain.csproj" />
+    <ProjectReference Include="..\src\FAIR.Infrastructure\FAIR.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
