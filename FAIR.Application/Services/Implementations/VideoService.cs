@@ -1,18 +1,25 @@
 using AutoMapper;
 using FAIR.Application.DTOs.Video;
+using FAIR.Application.Exceptions;
 using FAIR.Application.Services.Interfaces;
 using FAIR.Domain.Entities;
 using FAIR.Domain.Interfaces;
+using FluentValidation;
 
 namespace FAIR.Application.Services.Implementations
 {
-    public class VideoService(IRepositoryManager repositoryManager, IAiVideoService aiVideoService, IMapper mapper) : IVideoService
+    public class VideoService(
+        IRepositoryManager repositoryManager,
+        IAiVideoService aiVideoService,
+        IMapper mapper,
+        IValidator<VideoUploadDto> videoUploadDtoValidator) : IVideoService
     {
         public async Task<VideoAnalysisResponseDto> AnalyzeAsync(VideoUploadDto videoUploadDto, CancellationToken cancellationToken = default)
         {
-            if (videoUploadDto.Video is null || videoUploadDto.Video.Length <= 0)
+            var validationResult = await videoUploadDtoValidator.ValidateAsync(videoUploadDto, cancellationToken);
+            if (!validationResult.IsValid)
             {
-                throw new ArgumentException("A non-empty video file is required.", nameof(videoUploadDto.Video));
+                throw new ServiceValidationException(validationResult.Errors);
             }
 
             await using var videoStream = videoUploadDto.Video.OpenReadStream();
@@ -35,7 +42,8 @@ namespace FAIR.Application.Services.Implementations
 
         public async Task<IEnumerable<VideoAnalysisResponseDto>> GetAthleteAnalysisHistoryAsync(Guid athleteId, CancellationToken cancellationToken = default)
         {
-            var analyses = await repositoryManager.VideoAnalysis.GetAllByAthleteIdAsync(athleteId, trackChanges: false);
+            var athleteIdStr = athleteId.ToString();
+            var analyses = await repositoryManager.VideoAnalysis.GetAllByAthleteIdAsync(athleteIdStr, trackChanges: false);
             return mapper.Map<IEnumerable<VideoAnalysisResponseDto>>(analyses);
         }
 
