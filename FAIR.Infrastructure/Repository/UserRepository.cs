@@ -1,55 +1,43 @@
 using FAIR.Domain.Entities.Identity;
 using FAIR.Domain.Interfaces;
 using FAIR.Infrastructure.Context;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace FAIR.Infrastructure.Repository
 {
-    public class UserRepository : RepositoryBase<AppUser>, IUserRepository
+    public class UserRepository(dbContext context) : IUserRepository
     {
-        protected readonly UserManager<AppUser> _userManager;
-
-        public UserRepository(dbContext context, UserManager<AppUser> userManager) : base(context)
+        public async Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default)
         {
-            _userManager = userManager;
+            var normalized = email.Trim().ToLower();
+            return await context.Athletes.AsNoTracking().AnyAsync(a => a.Email != null && a.Email.ToLower() == normalized, cancellationToken)
+                || await context.Coaches.AsNoTracking().AnyAsync(c => c.Email != null && c.Email.ToLower() == normalized, cancellationToken);
         }
 
-        public async Task<bool> CreateUserAsync(AppUser user)
+        public async Task<bool> UsernameExistsAsync(string username, CancellationToken cancellationToken = default)
         {
-            return (await _userManager.CreateAsync(user, user.PasswordHash!)).Succeeded;
+            var normalized = username.Trim().ToLower();
+            return await context.Athletes.AsNoTracking().AnyAsync(a => a.UserName != null && a.UserName.ToLower() == normalized, cancellationToken)
+                || await context.Coaches.AsNoTracking().AnyAsync(c => c.UserName != null && c.UserName.ToLower() == normalized, cancellationToken);
         }
 
-        public async Task<bool> ChechPasswordAsync(AppUser user, string password)
+        public async Task<AppUser?> GetAnyByUsernameAsync(string username, CancellationToken cancellationToken = default)
         {
-            var result = await _userManager.CheckPasswordAsync(user, password);
-            return result;
+            var normalized = username.Trim().ToLower();
+            AppUser? user = await context.Athletes.AsNoTracking()
+                .FirstOrDefaultAsync(a => a.UserName != null && a.UserName.ToLower() == normalized, cancellationToken);
+            user ??= await context.Coaches.AsNoTracking()
+                .FirstOrDefaultAsync(c => c.UserName != null && c.UserName.ToLower() == normalized, cancellationToken);
+            return user;
         }
 
-        public async Task<AppUser> GetByUsernameAsync(string username)
-         => await FindByCondition(u => u.UserName == username, false).FirstOrDefaultAsync();
-
-        public async Task<AppUser> GetByEmailAsync(string email)
+        public async Task<AppUser?> GetAnyByIdAsync(string id, CancellationToken cancellationToken = default)
         {
-           return await _userManager.FindByEmailAsync(email);
+            AppUser? user = await context.Athletes.AsNoTracking()
+                .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
+            user ??= await context.Coaches.AsNoTracking()
+                .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+            return user;
         }
-
-        public async Task<Player> GetPlayerByIdAsync(string id, bool trackChanges)
-        => await FindByCondition(u => u.Id == id, trackChanges).OfType<Player>().FirstOrDefaultAsync();
-
-        public async Task<Coach> GetCoachByIdAsync(string id, bool trackChanges)
-        => await FindByCondition(u => u.Id == id, trackChanges)
-        .OfType<Coach>().FirstOrDefaultAsync();
-
-        public async Task<IdentityResult> ChangePasswordAsync(string userId, string CurrentPassword, string NewPassword)
-        {
-            var user = await _userManager.FindByIdAsync(userId);
-            return await _userManager.ChangePasswordAsync(user!, CurrentPassword, NewPassword);
-        }
-        public async Task<AppUser> GetByIdAsync(string id, bool trackChanges)
-        => await FindByCondition(u => u.Id == id, trackChanges).FirstOrDefaultAsync();
-
-        public async Task<List<AppUser>> GetUsersByIdsAsync(IEnumerable<string> ids)
-         => await FindByCondition(u => ids.Contains(u.Id), false).ToListAsync();
     }
 }
