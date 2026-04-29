@@ -29,7 +29,7 @@ namespace FAIR.Infrastructure.Repository
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config["Jwt:Key"]!));
             var cred = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
             var expairation = DateTime.UtcNow.AddDays(2);
-            var roleName = user is Player?"Player" : "Coach";
+            var roleName = user is Athlete?"Athlete" : "Coach";
             List<Claim> claim =[ 
                new Claim("FullName" , user.FullName!),
                 new Claim(ClaimTypes.NameIdentifier,user.Id.ToString()),
@@ -59,11 +59,19 @@ namespace FAIR.Infrastructure.Repository
         public List<Claim> GetUserClaimsFromToken(string token)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
-            var jwtToken = tokenHandler.ReadJwtToken(token);
-            if (jwtToken != null)
+            try
             {
-                return jwtToken.Claims.ToList();
+                var jwtToken = tokenHandler.ReadJwtToken(token);
+                if (jwtToken != null)
+                {
+                    return jwtToken.Claims.ToList();
+                }
             }
+            catch
+            {
+                return [];
+            }
+
             return [];
         }
         public async Task<int> UpdateRefreshToken(string refreshToken)
