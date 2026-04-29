@@ -4,9 +4,9 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace FAIR.Infrastructure.Configurations
 {
-    public class PlayerConfiguration : IEntityTypeConfiguration<Player>
+    public class AthleteConfiguration : IEntityTypeConfiguration<Athlete>
     {
-        public void Configure(EntityTypeBuilder<Player> builder)
+        public void Configure(EntityTypeBuilder<Athlete> builder)
         {
             builder.Property(x => x.FullName).HasMaxLength(150);
             builder.Property(x => x.Address).HasMaxLength(250);

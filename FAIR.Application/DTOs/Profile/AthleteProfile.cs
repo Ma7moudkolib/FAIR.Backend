@@ -1,6 +1,6 @@
 namespace FAIR.Application.DTOs.Profile
 {
-    public class PlayerProfile
+    public class AthleteProfile
     {
         public string Id { get; set; } = string.Empty;
         public string Username { get; set; } = string.Empty;

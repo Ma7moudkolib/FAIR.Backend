@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace FAIR.Application.DTOs.Profile
 {
-    public class UpdatePlayerProfile
+    public class UpdateAthleteProfile
     {
         public required string Id { get; set; }
 

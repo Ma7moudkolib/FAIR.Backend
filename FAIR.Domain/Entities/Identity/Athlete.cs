@@ -1,6 +1,6 @@
 namespace FAIR.Domain.Entities.Identity
 {
-    public class Player : AppUser
+    public class Athlete : AppUser
     {
         public DateOnly DateOfBirth { get; set; }
         public string? Address { get; set; }
