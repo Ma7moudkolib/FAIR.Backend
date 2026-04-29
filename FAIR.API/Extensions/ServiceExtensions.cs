@@ -5,7 +5,6 @@ using FAIR.Application.Services.Interfaces;
 using FAIR.Application.Services.Interfaces.Logging;
 using FAIR.Application.Services.Interfaces.Managers;
 using FAIR.Application.Services.Managers;
-using FAIR.Application.Validations;
 using FAIR.Application.Validations.Authentication;
 using FAIR.Domain.Entities.Identity;
 using FAIR.Domain.Interfaces;
@@ -15,6 +14,7 @@ using FAIR.Infrastructure.Options;
 using FAIR.Infrastructure.Repository;
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -51,9 +51,26 @@ namespace FAIR.API.Extensions
         {
             services.AddFluentValidationAutoValidation();
             services.AddValidatorsFromAssemblyContaining<CreateUserValidator>();
-            services.AddAutoMapper(typeof(MappingConfig));
+            services.Configure<ApiBehaviorOptions>(options =>
+            {
+                options.InvalidModelStateResponseFactory = context =>
+                {
+                    var errors = context.ModelState
+                        .Where(ms => ms.Value?.Errors.Count > 0)
+                        .Select(ms => new
+                        {
+                            Field = ms.Key,
+                            Errors = ms.Value!.Errors.Select(e => string.IsNullOrWhiteSpace(e.ErrorMessage) ? "Invalid value." : e.ErrorMessage)
+                        });
 
-            services.AddScoped<IValidationService, ValidationService>();
+                    return new BadRequestObjectResult(new
+                    {
+                        Message = "Validation failed",
+                        Errors = errors
+                    });
+                };
+            });
+            services.AddAutoMapper(typeof(MappingConfig));
 
             services.AddScoped<IServiceManager, ServiceManager>();
 
@@ -71,17 +88,6 @@ namespace FAIR.API.Extensions
 
         public static void ConfigureJWT(this IServiceCollection services, IConfiguration configuration)
         {
-            services.AddDefaultIdentity<AppUser>(options =>
-            {
-                options.SignIn.RequireConfirmedEmail = true;
-                options.Tokens.EmailConfirmationTokenProvider = TokenOptions.DefaultEmailProvider;
-                options.Password.RequireDigit = true;
-                options.Password.RequireNonAlphanumeric = true;
-                options.Password.RequiredLength = 8;
-                options.Password.RequireLowercase = true;
-                options.Password.RequireUppercase = true;
-                options.Password.RequiredUniqueChars = 1;
-            }).AddRoles<IdentityRole>().AddEntityFrameworkStores<dbContext>();
 
             services.AddAuthentication(options =>
             {

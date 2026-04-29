@@ -10,38 +10,42 @@ namespace FAIR.API.Controllers
     [Authorize]
     public class AccountController(IServiceManager serviceManager) : ControllerBase
     {
-        [HttpGet("playerProfile/{playerId}")]
-        public async Task<IActionResult> GetPlayerProfile(string playerId)
+        [HttpGet("athleteProfile/{athleteId}")]
+        public async Task<IActionResult> GetAthleteProfile(string athleteId)
         {
-            var profile = await serviceManager.UserService.GetPlayerProfileAsync(playerId);
+            var profile = await serviceManager.AthleteService.GetAthleteProfileAsync(athleteId);
             return profile != null ? Ok(profile) : NotFound();
         }
 
         [HttpGet("coachProfile/{coachId}")]
         public async Task<IActionResult> CoachProfile(string coachId)
         {
-            var profile = await serviceManager.UserService.GetCoachProfileAsync(coachId);
+            var profile = await serviceManager.CoachService.GetCoachProfileAsync(coachId);
             return profile != null ? Ok(profile) : NotFound();
         }
 
-        [HttpPut("updatePlayerProfile")]
-        public async Task<IActionResult> UpdatePlayerProfile([FromBody] UpdatePlayerProfile playerProfile)
+        [HttpPut("updateAthleteProfile")]
+        public async Task<IActionResult> UpdateAthleteProfile([FromBody] UpdateAthleteProfile athleteProfile)
         {
-            var result = await serviceManager.UserService.UpdatePlayerProfileAsync(playerProfile);
+            var result = await serviceManager.AthleteService.UpdateAthleteProfileAsync(athleteProfile);
             return Ok(result);
         }
 
         [HttpPut("updateCoachProfile")]
         public async Task<IActionResult> UpdateCoachProfile([FromBody] UpdateCoachProfile coachProfile)
         {
-            var result = await serviceManager.UserService.UpdateCoachProfileAsync(coachProfile);
+            var result = await serviceManager.CoachService.UpdateCoachProfileAsync(coachProfile);
             return Ok(result);
         }
 
         [HttpPut("change-password")]
         public async Task<IActionResult> ChangePassword(string userId, [FromBody] ChangePasswordRequest request)
         {
-            var result = await serviceManager.UserService.ChangePasswordAsync(userId, request);
+            var result = await serviceManager.AthleteService.ChangePasswordAsync(userId, request);
+            if (!result.Success && result.message == "Athlete Not Found!")
+            {
+                result = await serviceManager.CoachService.ChangePasswordAsync(userId, request);
+            }
             return Ok(result);
         }
     }

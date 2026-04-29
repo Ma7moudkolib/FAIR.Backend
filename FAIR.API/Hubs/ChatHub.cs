@@ -42,18 +42,7 @@ namespace FAIR.API.Hubs
                 return;
             }
 
-            var sender = await _repositoryManager.UserRepository.GetByIdAsync(senderId, false);
-            var dbMessage = new Message
-            {
-                SenderId = senderId,
-                ReceiverId = message.ReceiverId,
-                SenderName = sender?.UserName,
-                IsRead = false,
-                Content = message.Content,
-                CreateData = DateTime.UtcNow
-            };
-
-            var saved = await _repositoryManager.ChatRepository.SaveMessageAsync(dbMessage);
+            var saved = await _serviceManager.ChatService.SavePrivateMessageAsync(senderId, message);
             await Clients.User(message.ReceiverId).SendAsync("ReceivedMessage", saved);
             await Clients.User(senderId).SendAsync("MessageSent", saved);
         }

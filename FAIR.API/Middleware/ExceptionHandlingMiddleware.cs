@@ -1,4 +1,5 @@
 using System.Text.Json;
+using FAIR.Application.Exceptions;
 using FAIR.Application.Services.Interfaces.Logging;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +24,10 @@ namespace FAIR.API.Middleware
                     ? StatusCodes.Status413PayloadTooLarge
                     : StatusCodes.Status400BadRequest;
                 await WriteResponseAsync(context, statusCode, ex.Message);
+            }
+            catch (ServiceValidationException ex)
+            {
+                await WriteValidationResponseAsync(context, ex);
             }
             catch (Exception ex)
             {
@@ -58,6 +63,18 @@ namespace FAIR.API.Middleware
             context.Response.StatusCode = statusCode;
             context.Response.ContentType = "application/json";
             var payload = JsonSerializer.Serialize(new { error = message });
+            await context.Response.WriteAsync(payload);
+        }
+
+        private static async Task WriteValidationResponseAsync(HttpContext context, ServiceValidationException ex)
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            context.Response.ContentType = "application/json";
+            var payload = JsonSerializer.Serialize(new
+            {
+                message = "Validation failed",
+                errors = ex.Errors.Select(e => new { field = e.PropertyName, error = e.ErrorMessage })
+            });
             await context.Response.WriteAsync(payload);
         }
     }

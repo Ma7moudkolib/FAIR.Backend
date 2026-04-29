@@ -75,7 +75,7 @@ namespace FAIR.API.Controllers
         [HttpPost("search")]
         public async Task<IActionResult> Search([FromBody] AthleteSearchFilter filter, CancellationToken cancellationToken)
         {
-            var result = await serviceManager.AthleteSearchService.SearchAsync(filter, cancellationToken);
+            var result = await serviceManager.AthleteService.SearchAsync(filter, cancellationToken);
             return Ok(result);
         }
     }
