@@ -15,13 +15,13 @@ namespace FAIR.Application.Mapping
         {
 
 
-            CreateMap<Player, Register>().ReverseMap();
+            CreateMap<Athlete, Register>().ReverseMap();
             CreateMap<Coach, Register>().ReverseMap();
-            CreateMap<Player, UpdatePlayerProfile>().ReverseMap();
-            CreateMap<Player, PlayerProfile>().ReverseMap();
+            CreateMap<Athlete, UpdateAthleteProfile>().ReverseMap();
+            CreateMap<Athlete, AthleteProfile>().ReverseMap();
             CreateMap<Coach, UpdateCoachProfile>().ReverseMap();
             CreateMap<Coach, CoachProfile>().ReverseMap();
-            CreateMap<Player, AthleteSearchResult>()
+            CreateMap<Athlete, AthleteSearchResult>()
                 .ForMember(dest => dest.AthleteId, opt => opt.MapFrom(src => src.Id));
 
             CreateMap<AiModelMetricsDto, VideoAnalysis>()

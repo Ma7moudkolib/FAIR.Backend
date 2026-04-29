@@ -9,7 +9,7 @@ namespace FAIR.Domain.Entities
     {
         [Key]
         public Guid Id { get; set; } = Guid.NewGuid();
-        public Guid AthleteId { get; set; }
+        public string AthleteId { get; set; } = string.Empty;
         public string AiResultRaw { get; set; } = string.Empty;
         public decimal Score { get; set; }
         public decimal ScorePercentage { get; set; }
@@ -25,6 +25,6 @@ namespace FAIR.Domain.Entities
         public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
 
         [ForeignKey(nameof(AthleteId))]
-        public Player? Player { get; set; }
+        public Athlete? Athlete { get; set; }
     }
 }
